@@ -1,0 +1,656 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Subway Neon: Grid Arena (Multiplayer)</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #06060c;
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+    color: #fff;
+    user-select: none;
+  }
+  #wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100vw;
+    height: 100vh;
+    background: radial-gradient(circle at center, #111126 0%, #06060c 100%);
+  }
+  #hud-container {
+    display: flex;
+    justify-content: space-around;
+    width: 800px;
+    margin-bottom: 10px;
+  }
+  .player-card {
+    background: rgba(15, 15, 30, 0.85);
+    border: 2px solid #333;
+    padding: 8px 16px;
+    border-radius: 12px;
+    text-align: center;
+    min-width: 130px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    transition: all 0.3s;
+  }
+  .p1-card { border-color: #00f2fe; text-shadow: 0 0 5px #00f2fe; }
+  .p2-card { border-color: #ff007f; text-shadow: 0 0 5px #ff007f; }
+  .p3-card { border-color: #ffe600; text-shadow: 0 0 5px #ffe600; }
+  .p4-card { border-color: #00ff66; text-shadow: 0 0 5px #00ff66; }
+  
+  .card-title { font-size: 12px; font-weight: bold; margin-bottom: 4px; letter-spacing: 1px; }
+  .card-data { font-size: 18px; font-weight: 800; }
+  .dead { opacity: 0.3; border-color: #444 !important; text-shadow: none !important; }
+
+  #gameContainer {
+    position: relative;
+    width: 800px;
+    height: 700px;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+    background: #020205;
+  }
+  #menuOverlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(5, 5, 12, 0.9);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+  }
+  h1 {
+    font-size: 42px;
+    margin: 0 0 5px 0;
+    background: linear-gradient(45deg, #00f2fe, #ff007f);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+  .subtitle { color: #8a8a9e; margin-bottom: 25px; font-size: 14px; }
+  .setup-row {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 30px;
+  }
+  .selector-btn {
+    background: #151525;
+    color: #fff;
+    border: 2px solid #333;
+    padding: 10px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .selector-btn.active {
+    background: #00f2fe;
+    color: #000;
+    border-color: #00f2fe;
+    box-shadow: 0 0 15px rgba(0, 242, 254, 0.5);
+  }
+  .start-btn {
+    background: linear-gradient(90deg, #ff007f, #00f2fe);
+    color: #fff;
+    border: none;
+    padding: 14px 40px;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 30px;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(255, 0, 127, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .start-btn:hover { transform: scale(1.05); box-shadow: 0 6px 25px rgba(255, 0, 127, 0.6); }
+  
+  #controlsContainer {
+    margin-top: 15px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    width: 800px;
+    font-size: 11px;
+    color: #6a6a7e;
+    background: rgba(10,10,20,0.5);
+    padding: 10px;
+    border-radius: 8px;
+  }
+  .control-help span { color: #aaa; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div id="wrapper">
+  <div id="hud-container">
+    <div id="p1-card" class="player-card p1-card">
+      <div class="card-title">PLAYER 1</div>
+      <div id="p1-data" class="card-data">0 COINS</div>
+    </div>
+    <div id="p2-card" class="player-card p2-card dead">
+      <div class="card-title">PLAYER 2</div>
+      <div id="p2-data" class="card-data">OFFLINE</div>
+    </div>
+    <div id="p3-card" class="player-card p3-card dead">
+      <div class="card-title">PLAYER 3</div>
+      <div id="p3-data" class="card-data">OFFLINE</div>
+    </div>
+    <div id="p4-card" class="player-card p4-card dead">
+      <div class="card-title">PLAYER 4</div>
+      <div id="p4-data" class="card-data">OFFLINE</div>
+    </div>
+  </div>
+
+  <div id="gameContainer">
+    <div id="menuOverlay">
+      <h1 id="menuTitle">Subway Neon Arena</h1>
+      <p class="subtitle" id="menuSubtitle">Select number of local network/shared players to deploy:</p>
+      <div class="setup-row">
+        <button class="selector-btn" onclick="setPlayers(1)">1 Player</button>
+        <button class="selector-btn active" onclick="setPlayers(2)">2 Players</button>
+        <button class="selector-btn" onclick="setPlayers(3)">3 Players</button>
+        <button class="selector-btn" onclick="setPlayers(4)">4 Players</button>
+      </div>
+      <button class="start-btn" onclick="startGame()">Launch Match</button>
+    </div>
+    <canvas id="game" width="800" height="700"></canvas>
+  </div>
+
+  <div id="controlsContainer">
+    <div class="control-help"><span>P1 (Cyan):</span> A/D = Move Lane | W = Jump | S = Slide</div>
+    <div class="control-help"><span>P2 (Magenta):</span> Left/Right Arrow = Move | Up = Jump | Down = Slide</div>
+    <div class="control-help"><span>P3 (Yellow):</span> J/L = Move Lane | I = Jump | K = Slide</div>
+    <div class="control-help"><span>P4 (Lime):</span> F/H = Move Lane | T = Jump | G = Slide</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const menuOverlay = document.getElementById('menuOverlay');
+const menuTitle = document.getElementById('menuTitle');
+const menuSubtitle = document.getElementById('menuSubtitle');
+
+const W = canvas.width, H = canvas.height;
+const HORIZON_Y = H * 0.35;
+const BASE_PLAYER_Z = 500;
+
+let activeConfigPlayers = 2;
+let players = [];
+let obstacles = [];
+let coins = [];
+let particles = [];
+let globalSpeed = 6.5;
+let gameRunning = false;
+let frame = 0;
+
+const PLAYER_PROFILES = [
+  { id: 1, color: '#00f2fe', shadow: 'rgba(0,242,254,0.4)', card: document.getElementById('p1-card'), data: document.getElementById('p1-data') },
+  { id: 2, color: '#ff007f', shadow: 'rgba(255,0,127,0.4)', card: document.getElementById('p2-card'), data: document.getElementById('p2-data') },
+  { id: 3, color: '#ffe600', shadow: 'rgba(255,230,0,0.4)', card: document.getElementById('p3-card'), data: document.getElementById('p3-data') },
+  { id: 4, color: '#00ff66', shadow: 'rgba(0,255,102,0.4)', card: document.getElementById('p4-card'), data: document.getElementById('p4-data') }
+];
+
+function setPlayers(num) {
+  activeConfigPlayers = num;
+  document.querySelectorAll('.selector-btn').forEach((btn, idx) => {
+    btn.classList.toggle('active', idx === num - 1);
+  });
+}
+
+function startGame() {
+  players = [];
+  obstacles = [];
+  coins = [];
+  particles = [];
+  globalSpeed = 7;
+  frame = 0;
+
+  // Initialize UI profiles cleanly
+  PLAYER_PROFILES.forEach((profile, idx) => {
+    if (idx < activeConfigPlayers) {
+      profile.card.classList.remove('dead');
+      profile.data.textContent = "0 COINS";
+      
+      // Distribute starter lanes cleanly based on player count
+      let initialLane = idx % 3; 
+      players.push({
+        id: profile.id,
+        color: profile.color,
+        shadow: profile.shadow,
+        lane: initialLane,
+        targetLane: initialLane,
+        x: laneX(initialLane, BASE_PLAYER_Z),
+        z: BASE_PLAYER_Z,
+        y: 0,
+        vy: 0,
+        jumping: false,
+        sliding: false,
+        slideTimer: 0,
+        coins: 0,
+        alive: true,
+        width: 32,
+        height: 50,
+        bumpCooldown: 0
+      });
+    } else {
+      profile.card.classList.add('dead');
+      profile.data.textContent = "OFFLINE";
+    }
+  });
+
+  menuOverlay.style.display = 'none';
+  gameRunning = true;
+}
+
+function triggerGameOver() {
+  gameRunning = false;
+  menuTitle.textContent = "Match Finished";
+  
+  // Find winner based on highest coin profile survival
+  let summaryText = "Final Rankings:<br>";
+  let sorted = [...players].sort((a,b) => b.coins - a.coins);
+  sorted.forEach((p, i) => {
+    summaryText += `Rank ${i+1}: <span style="color:${p.color};font-weight:bold">Player ${p.id}</span> (${p.coins} Coins)<br>`;
+  });
+
+  menuSubtitle.innerHTML = summaryText;
+  document.querySelector('.start-btn').textContent = "Rematch Battle";
+  menuOverlay.style.display = 'flex';
+}
+
+/* --- 3D Projection Matrix math functions --- */
+function projectY(z) {
+  return HORIZON_Y + (z / 700) * (H - HORIZON_Y);
+}
+function projectScale(z) {
+  return 0.12 + (z / 700) * 0.88;
+}
+function laneX(lane, z) {
+  const center = W / 2;
+  const spread = (lane - 1) * (W * 0.32);
+  return center + spread * (z / 700);
+}
+
+/* --- Controls Mapper Configurations --- */
+document.addEventListener('keydown', e => {
+  if (!gameRunning) return;
+  
+  // Player 1: WASD
+  if (players[0] && players[0].alive) {
+    if (e.code === 'KeyA') commandMove(players[0], -1);
+    if (e.code === 'KeyD') commandMove(players[0], 1);
+    if (e.code === 'KeyW') commandJump(players[0]);
+    if (e.code === 'KeyS') commandSlide(players[0]);
+  }
+  // Player 2: Arrow Keys
+  if (players[1] && players[1].alive) {
+    if (e.code === 'ArrowLeft') commandMove(players[1], -1);
+    if (e.code === 'ArrowRight') commandMove(players[1], 1);
+    if (e.code === 'ArrowUp') commandJump(players[1]);
+    if (e.code === 'ArrowDown') commandSlide(players[1]);
+  }
+  // Player 3: IJKL
+  if (players[2] && players[2].alive) {
+    if (e.code === 'KeyJ') commandMove(players[2], -1);
+    if (e.code === 'KeyL') commandMove(players[2], 1);
+    if (e.code === 'KeyI') commandJump(players[2]);
+    if (e.code === 'KeyK') commandSlide(players[2]);
+  }
+  // Player 4: TFGH
+  if (players[3] && players[3].alive) {
+    if (e.code === 'KeyF') commandMove(players[3], -1);
+    if (e.code === 'KeyH') commandMove(players[3], 1);
+    if (e.code === 'KeyT') commandJump(players[3]);
+    if (e.code === 'KeyG') commandSlide(players[3]);
+  }
+});
+
+function commandMove(p, dir) {
+  let next = p.targetLane + dir;
+  if (next >= 0 && next <= 2) p.targetLane = next;
+}
+function commandJump(p) {
+  if (!p.jumping && !p.sliding) { p.jumping = true; p.vy = -12.5; }
+}
+function commandSlide(p) {
+  if (!p.jumping && !p.sliding) { p.sliding = true; p.slideTimer = 22; }
+  else if (p.jumping && p.vy < 0) { p.vy = 4; } // Fast smash down mechanic
+}
+
+/* --- Spawner Mechanics Loop --- */
+function proceduralGeneration() {
+  if (frame % Math.max(20, 60 - Math.floor(globalSpeed * 2.5)) === 0) {
+    const lane = Math.floor(Math.random() * 3);
+    const r = Math.random();
+
+    if (r < 0.4) {
+      const type = Math.random() < 0.5 ? 'barrier' : 'low';
+      obstacles.push({ lane, type, z: 0, w: 56, h: type === 'barrier' ? 55 : 22 });
+    } else if (r < 0.7) {
+      obstacles.push({ lane, type: 'train', z: 0, w: 75, h: 110 });
+    } else {
+      // Row cluster of sequential currency coins
+      const length = 3 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < length; i++) {
+        coins.push({ lane, z: -(i * 40), collected: false, rot: Math.random() * Math.PI });
+      }
+    }
+  }
+}
+
+function spawnBurst(x, y, color, count = 8) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 7,
+      vy: (Math.random() - 0.5) * 7,
+      alpha: 1,
+      color
+    });
+  }
+}
+
+/* --- Core Loop Frame Updates --- */
+function update() {
+  frame++;
+  globalSpeed += 0.001;
+  proceduralGeneration();
+
+  // Update Dynamic Particle Engine Vectors
+  for (let i = particles.length - 1; i >= 0; i--) {
+    let p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.alpha -= 0.03;
+    if (p.alpha <= 0) particles.splice(i, 1);
+  }
+
+  // Update Players state loops
+  players.forEach(p => {
+    if (!p.alive) return;
+
+    if (p.bumpCooldown > 0) p.bumpCooldown--;
+
+    // Move smoothly towards calculated target positions
+    let targetX = laneX(p.targetLane, p.z);
+    p.x += (targetX - p.x) * 0.22;
+    if (Math.abs(p.x - laneX(p.targetLane, p.z)) < 15) p.lane = p.targetLane;
+
+    // Gravity Physics Engine simulation
+    if (p.jumping) {
+      p.y += p.vy; p.vy += 0.7;
+      if (p.y >= 0) { p.y = 0; p.jumping = false; p.vy = 0; }
+    }
+    if (p.sliding) {
+      p.slideTimer--;
+      if (p.slideTimer <= 0) p.sliding = false;
+    }
+  });
+
+  // Evaluated Inter-Player Structural Grid Collisions (Bumping Mechanic)
+  for (let i = 0; i < players.length; i++) {
+    for (let j = i + 1; j < players.length; j++) {
+      let p1 = players[i];
+      let p2 = players[j];
+
+      if (!p1.alive || !p2.alive) continue;
+
+      // Handle overlap checks if players are sharing localized paths
+      const scale = projectScale(BASE_PLAYER_Z);
+      const widthThreshold = p1.width * scale * 1.1;
+
+      if (Math.abs(p1.x - p2.x) < widthThreshold && Math.abs(p1.y - p2.y) < 30) {
+        if (p1.bumpCooldown === 0 && p2.bumpCooldown === 0) {
+          // Trigger a collision bounce interaction
+          p1.bumpCooldown = 25;
+          p2.bumpCooldown = 25;
+
+          // Bounce back across targets
+          let t1 = p1.targetLane;
+          p1.targetLane = p2.lane;
+          p2.targetLane = t1;
+
+          // Deduct coin counts penalties instantly
+          if (p1.coins > 0) { p1.coins--; spawnBurst(p1.x, projectY(p1.z) + p1.y*scale, '#ff0033', 12); }
+          if (p2.coins > 0) { p2.coins--; spawnBurst(p2.x, projectY(p2.z) + p2.y*scale, '#ff0033', 12); }
+
+          PLAYER_PROFILES[p1.id-1].data.textContent = `${p1.coins} COINS`;
+          PLAYER_PROFILES[p2.id-1].data.textContent = `${p2.coins} COINS`;
+        }
+      }
+    }
+  }
+
+  // Update Scene Interactive Obstacles
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    let o = obstacles[i];
+    o.z += globalSpeed;
+    if (o.z > 750) { obstacles.splice(i, 1); continue; }
+
+    // Hitbox evaluations across live players indexes
+    players.forEach(p => {
+      if (!p.alive) return;
+
+      if (o.z + 15 >= p.z && o.z - 55 <= p.z) {
+        const oScale = projectScale(o.z);
+        const oW = o.w * oScale;
+        const oH = o.h * oScale;
+        const oX = laneX(o.lane, o.z);
+        const oY = projectY(o.z);
+
+        const pScale = projectScale(p.z);
+        const pW = p.width * pScale;
+        const pH = (p.sliding ? p.height * 0.5 : p.height) * pScale;
+        const pX = p.x;
+        const pY = oY + p.y * pScale;
+
+        // Bounding frame box calculations
+        const hitX = pX + pW/2 > oX - oW/2 && pX - pW/2 < oX + oW/2;
+
+        if (hitX) {
+          if (o.type === 'train') {
+            if (p.jumping && pY <= oY - oH + 12 && p.vy > 0) {
+              p.y = -o.h; p.jumping = false; p.vy = 0; // Safety landing threshold reached
+            } else if (p.y > -o.h + 5) {
+              p.alive = false;
+              spawnBurst(p.x, pY, p.color, 25);
+              PLAYER_PROFILES[p.id-1].card.classList.add('dead');
+            }
+          } else if (o.type === 'barrier' && pY > oY - oH) {
+            p.alive = false; spawnBurst(p.x, pY, p.color, 25);
+            PLAYER_PROFILES[p.id-1].card.classList.add('dead');
+          } else if (o.type === 'low' && !p.sliding) {
+            p.alive = false; spawnBurst(p.x, pY, p.color, 25);
+            PLAYER_PROFILES[p.id-1].card.classList.add('dead');
+          }
+        }
+      }
+
+      // Edge fall down check off passing trains roofs
+      if (o.lane === p.lane && o.type === 'train' && p.y === -o.h) {
+        if (p.z < o.z - 55 || p.z > o.z + 15) {
+          p.y = 0; p.jumping = true; p.vy = 0;
+        }
+      }
+    });
+  }
+
+  // Update Collectable Coins Arrays
+  for (let i = coins.length - 1; i >= 0; i--) {
+    let c = coins[i];
+    c.z += globalSpeed; c.rot += 0.05;
+    if (c.z > 720) { coins.splice(i, 1); continue; }
+
+    players.forEach(p => {
+      if (!p.alive) return;
+      if (Math.abs(c.z - p.z) < 25 && c.lane === p.lane) {
+        const scale = projectScale(c.z);
+        const cY = projectY(c.z);
+        const pScale = projectScale(p.z);
+        const pH = (p.sliding ? p.height * 0.5 : p.height) * pScale;
+        const pTop = cY + p.y * pScale - pH;
+        const pBot = cY + p.y * pScale;
+
+        if (cY >= pTop - 15 && cY <= pBot + 15) {
+          p.coins++;
+          PLAYER_PROFILES[p.id-1].data.textContent = `${p.coins} COINS`;
+          spawnBurst(laneX(c.lane, c.z), cY, '#ffe600', 6);
+          coins.splice(i, 1);
+        }
+      }
+    });
+  }
+
+  // Check game condition states across teams array lists
+  if (players.length > 0 && players.every(p => !p.alive)) {
+    triggerGameOver();
+  }
+}
+
+/* --- Graphics Rendering Pipelines --- */
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Background Synth Ambient Space Sky
+  let skyGrad = ctx.createLinearGradient(0, 0, 0, HORIZON_Y);
+  skyGrad.addColorStop(0, '#020206'); skyGrad.addColorStop(1, '#0e091a');
+  ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, W, HORIZON_Y);
+
+  // Horizon Neon Laser Grid Architecture
+  ctx.strokeStyle = 'rgba(111, 66, 193, 0.2)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= W; i += 50) {
+    ctx.beginPath(); ctx.moveTo(i, HORIZON_Y); ctx.lineTo(i, 0); ctx.stroke();
+  }
+
+  // Draw Arena Floor Ground Layout Platform
+  let groundGrad = ctx.createLinearGradient(0, HORIZON_Y, 0, H);
+  groundGrad.addColorStop(0, '#090914'); groundGrad.addColorStop(1, '#020205');
+  ctx.fillStyle = groundGrad;
+  ctx.beginPath(); ctx.moveTo(W*0.05, HORIZON_Y); ctx.lineTo(W*0.95, HORIZON_Y);
+  ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.fill();
+
+  // Edge Wall Borders lines
+  ctx.strokeStyle = '#ff0055'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(W*0.05, HORIZON_Y); ctx.lineTo(0, H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W*0.95, HORIZON_Y); ctx.lineTo(W, H); ctx.stroke();
+
+  // Draw 3 Dedicated Vector Runner Rails
+  for (let l = 0; l < 3; l++) {
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(laneX(l, 0), HORIZON_Y); ctx.lineTo(laneX(l, 700), H); ctx.stroke();
+
+    // Fast Speed motion wind vectors lines tracking
+    ctx.strokeStyle = 'rgba(0, 242, 254, 0.15)'; ctx.lineWidth = 2;
+    let streakZ = ((frame * globalSpeed * 2.2 + l * 200) % 700);
+    ctx.beginPath();
+    ctx.moveTo(laneX(l, streakZ), projectY(streakZ));
+    ctx.lineTo(laneX(l, Math.min(700, streakZ + 60)), projectY(Math.min(700, streakZ + 60)));
+    ctx.stroke();
+  }
+
+  // Draw System Coins Assets
+  for (const c of coins) {
+    if (c.z < 10) continue;
+    const cScale = projectScale(c.z);
+    const cx = laneX(c.lane, c.z);
+    const cy = projectY(c.z);
+    const size = 11 * cScale;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(Math.sin(c.rot), 1);
+    ctx.fillStyle = '#ffe600';
+    ctx.shadowBlur = 8; ctx.shadowColor = '#ffe600';
+    ctx.beginPath(); ctx.arc(0, 0, size, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // Draw System Obstacles Entities
+  for (const o of obstacles) {
+    if (o.z < 10) continue;
+    const oScale = projectScale(o.z);
+    const x = laneX(o.lane, o.z);
+    const y = projectY(o.z);
+    const w = o.w * oScale;
+    const h = o.h * oScale;
+
+    if (o.type === 'barrier') {
+      let grad = ctx.createLinearGradient(x-w/2, y, x+w/2, y);
+      grad.addColorStop(0, '#ff3333'); grad.addColorStop(1, '#990000');
+      ctx.fillStyle = grad; ctx.fillRect(x - w/2, y - h, w, h);
+      ctx.fillStyle = '#fff'; ctx.fillRect(x - w/2, y - h, w, h * 0.15);
+    } else if (o.type === 'low') {
+      ctx.fillStyle = '#ff9f43'; ctx.shadowBlur = 10; ctx.shadowColor = '#ff9f43';
+      ctx.fillRect(x - w/2, y - h, w, h * 0.35);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#4b4b5e';
+      ctx.fillRect(x - w/2, y - h, w*0.1, h); ctx.fillRect(x + w/2 - w*0.1, y - h, w*0.1, h);
+    } else if (o.type === 'train') {
+      let tGrad = ctx.createLinearGradient(x-w/2, y, x+w/2, y);
+      tGrad.addColorStop(0, '#2c3e50'); tGrad.addColorStop(1, '#0f171e');
+      ctx.fillStyle = tGrad; ctx.fillRect(x - w/2, y - h, w, h);
+      // Windshield display
+      ctx.fillStyle = '#00f2fe'; ctx.shadowBlur = 10; ctx.shadowColor = '#00f2fe';
+      ctx.fillRect(x - w*0.35, y - h*0.85, w*0.7, h*0.18);
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  // Draw Active Particles Engine Systems
+  for (const p of particles) {
+    ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, 5, 5); ctx.restore();
+  }
+
+  // Render Playable Runners Characters Layer Arrays
+  players.forEach(p => {
+    if (!p.alive) return;
+
+    const pScale = projectScale(p.z);
+    const px = p.x;
+    const py = projectY(p.z) + p.y * pScale;
+    const pw = p.width * pScale;
+    const ph = (p.sliding ? p.height * 0.5 : p.height) * pScale;
+
+    // Track Ground Shadows Layout Indicator arcs
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath(); ctx.ellipse(px, projectY(p.z), pw * 0.7, 5 * pScale, 0, 0, Math.PI*2); ctx.fill();
+
+    // Body suit core mesh renders
+    ctx.save();
+    ctx.fillStyle = p.color;
+    ctx.shadowBlur = 15; ctx.shadowColor = p.color;
+    ctx.beginPath(); ctx.roundRect(px - pw/2, py - ph, pw, ph, 5 * pScale); ctx.fill();
+    ctx.restore();
+
+    // Visor designs
+    ctx.fillStyle = '#05050a';
+    ctx.fillRect(px - pw*0.3, py - ph + (p.sliding ? 5 : 9)*pScale, pw*0.6, ph*0.22);
+  });
+}
+
+function loop() {
+  if (gameRunning) {
+    update();
+    draw();
+  }
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
+
